@@ -15,6 +15,7 @@
 # limitations under the License.
 import os
 
+
 def print_title(text, center=True, char="-"):
     try:
         terminal_size = os.get_terminal_size().columns
@@ -28,10 +29,13 @@ def print_title(text, center=True, char="-"):
         text = text.center(terminal_size)
     print("\n" + chars + "\n" + text + "\n" + chars + "\n")
 
+
 def run_brain_extraction(in_dir, out_dir, method):
 
     if method == "monaifbs":
-        from fetpype_utils.monaifbs.src.inference.monai_dynunet_inference import run_inference
+        from fetpype_utils.monaifbs.src.inference.monai_dynunet_inference import (
+            run_inference,
+        )
         import fetpype_utils
         from fetpype_utils import monaifbs
         import yaml
@@ -44,7 +48,10 @@ def run_brain_extraction(in_dir, out_dir, method):
             ]
         )
         if method == "monaifbs":
-            brain_ckpt = os.path.join(os.path.dirname(fetpype_utils.__file__),"models_ckpt/monaifbs_checkpoint_dynUnet_DiceXent.pt")
+            brain_ckpt = os.path.join(
+                os.path.dirname(fetpype_utils.__file__),
+                "models_ckpt/monaifbs_checkpoint_dynUnet_DiceXent.pt",
+            )
         if not os.path.isfile(brain_ckpt):
             raise ValueError(f"MONAIfbs ckpt not found at {brain_ckpt}.")
 
@@ -60,26 +67,35 @@ def run_brain_extraction(in_dir, out_dir, method):
         }
         os.makedirs(config["output"]["out_dir"], exist_ok=True)
         config["inference"]["model_to_load"] = brain_ckpt
-        in_files = [os.path.join(in_dir,p) for p in os.listdir(in_dir) if p.endswith(".nii.gz")]
+        in_files = [
+            os.path.join(in_dir, p)
+            for p in os.listdir(in_dir)
+            if p.endswith(".nii.gz")
+        ]
         run_inference(in_files, config)
     else:
         from fetpype_utils.fetal_bet.codes.inference import inference
         import fetpype_utils
         import torch
+
         # Make it a Namespace
         from types import SimpleNamespace
+
         args = SimpleNamespace()
         args.n_gpu = 1
         args.deterministic = 1
         args.seed = 1234
-        args.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        args.saved_model_path = os.path.join(os.path.dirname(fetpype_utils.__file__),"models_ckpt/fetbet_AttUNet.pth")
+        args.device = torch.device(
+            "cuda" if torch.cuda.is_available() else "cpu"
+        )
+        args.saved_model_path = os.path.join(
+            os.path.dirname(fetpype_utils.__file__),
+            "models_ckpt/fetbet_AttUNet.pth",
+        )
         args.data_path = in_dir
         args.save_path = out_dir
 
         inference(args)
-        
-
 
 
 def main():
@@ -111,10 +127,9 @@ def main():
 
     p.add_argument(
         "--method",
-        choices=["monaifbs","fet_bet"],
+        choices=["monaifbs", "fet_bet"],
         default="monaifbs",
     )
-
 
     args = p.parse_args()
     print_title("Running Brain extraction")
@@ -126,11 +141,11 @@ def main():
     # Creating the pattern to save the resulting masks
 
     # Create a tmp directory for the output of monaifbs segmentation
-    #masks_tmp = os.path.join(args.masks_dir, "tmp")
-    #files_paths = [o[3] for o in files_filtered]
+    # masks_tmp = os.path.join(args.masks_dir, "tmp")
+    # files_paths = [o[3] for o in files_filtered]
     run_brain_extraction(input_dir, out_dir, args.method)
     # Move files to their definitive location
-    #bidsify_monaifbs(files_filtered, bids_layout, mask_pattern, masks_tmp)
+    # bidsify_monaifbs(files_filtered, bids_layout, mask_pattern, masks_tmp)
 
     return 0
 

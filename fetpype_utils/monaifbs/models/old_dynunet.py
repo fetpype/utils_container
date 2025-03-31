@@ -97,9 +97,7 @@ class DynUNet(nn.Module):
 
     def check_kernel_stride(self):
         kernels, strides = self.kernel_size, self.strides
-        error_msg = (
-            "length of kernel_size and strides should be the same, and no less than 3."
-        )
+        error_msg = "length of kernel_size and strides should be the same, and no less than 3."
         assert len(kernels) == len(strides) and len(kernels) >= 3, error_msg
         for idx in range(len(kernels)):
             kernel, stride = kernels[idx], strides[idx]
@@ -117,7 +115,9 @@ class DynUNet(nn.Module):
     def check_deep_supr_num(self):
         deep_supr_num, strides = self.deep_supr_num, self.strides
         num_up_layers = len(strides) - 1
-        error_msg = "deep_supr_num should be less than the number of up sample layers."
+        error_msg = (
+            "deep_supr_num should be less than the number of up sample layers."
+        )
         assert 1 <= deep_supr_num < num_up_layers, error_msg
 
     def forward(self, x):
@@ -172,11 +172,16 @@ class DynUNet(nn.Module):
     def get_downsamples(self):
         inp, out = self.filters[:-2], self.filters[1:-1]
         strides, kernel_size = self.strides[1:-1], self.kernel_size[1:-1]
-        return self.get_module_list(inp, out, kernel_size, strides, self.conv_block)
+        return self.get_module_list(
+            inp, out, kernel_size, strides, self.conv_block
+        )
 
     def get_upsamples(self):
         inp, out = self.filters[1:][::-1], self.filters[:-1][::-1]
-        strides, kernel_size = self.strides[1:][::-1], self.kernel_size[1:][::-1]
+        strides, kernel_size = (
+            self.strides[1:][::-1],
+            self.kernel_size[1:][::-1],
+        )
         upsample_kernel_size = self.upsample_kernel_size[::-1]
         return self.get_module_list(
             inp, out, kernel_size, strides, UnetUpBlock, upsample_kernel_size
@@ -189,12 +194,18 @@ class DynUNet(nn.Module):
         kernel_size: Sequence[Union[Sequence[int], int]],
         strides: Sequence[Union[Sequence[int], int]],
         conv_block: nn.Module,
-        upsample_kernel_size: Optional[Sequence[Union[Sequence[int], int]]] = None,
+        upsample_kernel_size: Optional[
+            Sequence[Union[Sequence[int], int]]
+        ] = None,
     ):
         layers = []
         if upsample_kernel_size is not None:
             for in_c, out_c, kernel, stride, up_kernel in zip(
-                in_channels, out_channels, kernel_size, strides, upsample_kernel_size
+                in_channels,
+                out_channels,
+                kernel_size,
+                strides,
+                upsample_kernel_size,
             ):
                 params = {
                     "spatial_dims": self.spatial_dims,
@@ -225,7 +236,10 @@ class DynUNet(nn.Module):
 
     def get_deep_supervision_heads(self):
         return nn.ModuleList(
-            [self.get_output_block(i + 1) for i in range(len(self.upsamples) - 1)]
+            [
+                self.get_output_block(i + 1)
+                for i in range(len(self.upsamples) - 1)
+            ]
         )
 
     @staticmethod

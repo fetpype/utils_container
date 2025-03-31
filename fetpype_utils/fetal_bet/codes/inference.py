@@ -66,21 +66,30 @@ class FetalTestData:
         test_transforms_list = [
             tr.LoadImaged(keys=["image"]),
             tr.EnsureChannelFirstd(keys=["image"]),
-            tr.Spacingd(keys="image", pixdim=(1.0, 1.0, -1.0), mode="bilinear", padding_mode="zeros"),
-            SliceWiseNormalizeIntensityd(keys=["image"], subtrahend=0.0, divisor=None, nonzero=True),
+            tr.Spacingd(
+                keys="image",
+                pixdim=(1.0, 1.0, -1.0),
+                mode="bilinear",
+                padding_mode="zeros",
+            ),
+            SliceWiseNormalizeIntensityd(
+                keys=["image"], subtrahend=0.0, divisor=None, nonzero=True
+            ),
         ]
         return test_transforms_list
 
     def load_data(self):
         test_transforms_list = self.transformations()
-        test_images = sorted(glob(os.path.join(self.test_data_paths, "*.nii.gz")))
+        test_images = sorted(
+            glob(os.path.join(self.test_data_paths, "*.nii.gz"))
+        )
 
         test_files = [{"image": image_name} for image_name in test_images]
 
-        test_dataset = Dataset(data=test_files, transform=tr.Compose(test_transforms_list))
-        test_dataloader = DataLoader(test_dataset,
-                                     batch_size=1,
-                                     num_workers=0)
+        test_dataset = Dataset(
+            data=test_files, transform=tr.Compose(test_transforms_list)
+        )
+        test_dataloader = DataLoader(test_dataset, batch_size=1, num_workers=0)
 
         return test_dataloader, test_transforms_list
 
@@ -103,7 +112,9 @@ def inference(args):
 
     # model_path has module. in its file name, so it needs to be fixed
 
-    model.load_state_dict(torch.load(args.saved_model_path, map_location=device))
+    model.load_state_dict(
+        torch.load(args.saved_model_path, map_location=device)
+    )
 
     model.eval()
 
@@ -115,75 +126,89 @@ def inference(args):
         spatial_dim=2,
         sw_batch_size=4,
         overlap=0.50,
-        progress=False
+        progress=False,
     )
 
-    post_transforms = tr.Compose([
-        tr.Invertd(
-            keys="pred",
-            transform=tr.Compose(test_org_transforms_list),
-            orig_keys="image",
-            meta_keys="pred_meta_dict",
-            orig_meta_keys="image_meta_dict",
-            meta_key_postfix="meta_dict",
-            nearest_interp=False,
-            to_tensor=True,
-        ),
-        tr.Activationsd(keys="pred", softmax=True),
-        tr.AsDiscreted(keys="pred", argmax=True, to_onehot=None),
-        SaveImaged(keys="pred", meta_keys="pred_meta_dict", output_dir=args.save_path, print_log=False,
-                   separate_folder=False, output_postfix="mask", resample=False),
-    ]
+    post_transforms = tr.Compose(
+        [
+            tr.Invertd(
+                keys="pred",
+                transform=tr.Compose(test_org_transforms_list),
+                orig_keys="image",
+                meta_keys="pred_meta_dict",
+                orig_meta_keys="image_meta_dict",
+                meta_key_postfix="meta_dict",
+                nearest_interp=False,
+                to_tensor=True,
+            ),
+            tr.Activationsd(keys="pred", softmax=True),
+            tr.AsDiscreted(keys="pred", argmax=True, to_onehot=None),
+            SaveImaged(
+                keys="pred",
+                meta_keys="pred_meta_dict",
+                output_dir=args.save_path,
+                print_log=False,
+                separate_folder=False,
+                output_postfix="mask",
+                resample=False,
+            ),
+        ]
     )
-    print('here1')
+    print("here1")
     print(len(test_dataloader))
     print(args.data_path)
     with torch.no_grad():
         for i, test_data in enumerate(tqdm(test_dataloader, desc="Inference")):
             test_inputs = test_data["image"].to(device)
             test_data["pred"] = inferer(test_inputs, model)
-            test_data = [post_transforms(i) for i in decollate_batch(test_data)]
+            test_data = [
+                post_transforms(i) for i in decollate_batch(test_data)
+            ]
 
-    print('Process completed')
+    print("Process completed")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     parser = argparse.ArgumentParser()
 
-    parser.add_argument('--n_gpu',
-                        type=int,
-                        default=2,
-                        help='total gpu')
+    parser.add_argument("--n_gpu", type=int, default=2, help="total gpu")
 
-    parser.add_argument('--deterministic',
-                        type=int,
-                        default=1,
-                        help='whether use deterministic training')
+    parser.add_argument(
+        "--deterministic",
+        type=int,
+        default=1,
+        help="whether use deterministic training",
+    )
 
-    parser.add_argument('--seed',
-                        type=int,
-                        default=1234,
-                        help='random seed')
+    parser.add_argument("--seed", type=int, default=1234, help="random seed")
 
-    parser.add_argument('--device',
-                        type=str,
-                        default=torch.device("cuda" if torch.cuda.is_available() else "cpu"),
-                        help='what device to use')
+    parser.add_argument(
+        "--device",
+        type=str,
+        default=torch.device("cuda" if torch.cuda.is_available() else "cpu"),
+        help="what device to use",
+    )
 
-    parser.add_argument('--saved_model_path',
-                        type=str,
-                        default="/path/in/container/src/saved_models/AttUNet.pth",
-                        help='path to the saved model')
+    parser.add_argument(
+        "--saved_model_path",
+        type=str,
+        default="/path/in/container/src/saved_models/AttUNet.pth",
+        help="path to the saved model",
+    )
 
-    parser.add_argument('--data_path',
-                        type=str,
-                        default="../../dataset/f0832s1/",
-                        help='path to the test data')
+    parser.add_argument(
+        "--data_path",
+        type=str,
+        default="../../dataset/f0832s1/",
+        help="path to the test data",
+    )
 
-    parser.add_argument('--save_path',
-                        type=str,
-                        default='../../dataset/f0832s1/prediction',
-                        help='path to save the out')
+    parser.add_argument(
+        "--save_path",
+        type=str,
+        default="../../dataset/f0832s1/prediction",
+        help="path to save the out",
+    )
 
     args = parser.parse_args()
 

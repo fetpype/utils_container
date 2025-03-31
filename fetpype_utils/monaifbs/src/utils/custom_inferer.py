@@ -34,8 +34,8 @@ class Predict2DFrom3D:
     Args:
         predictor (Network): trained network to perform the prediction
     """
-    def __init__(self,
-                 predictor):
+
+    def __init__(self, predictor):
         self.predictor = predictor
 
     def __call__(self, data):
@@ -49,12 +49,14 @@ class Predict2DFrom3D:
         # squeeze dimensions equal to 1
         orig_size = list(data.shape)
         data_size = list(data.shape[2:])
-        for idx_dim in range(2, 2+len(data_size)):
-            if data_size[idx_dim-2] == 1:
+        for idx_dim in range(2, 2 + len(data_size)):
+            if data_size[idx_dim - 2] == 1:
                 data = torch.squeeze(data, dim=idx_dim)
         predictions = self.predictor(data)  # batched patch segmentation
         new_size = copy.deepcopy(orig_size)
-        new_size[1] = predictions.shape[1]   # keep original data shape, but take channel dimension from the prediction
+        new_size[1] = predictions.shape[
+            1
+        ]  # keep original data shape, but take channel dimension from the prediction
         predictions = torch.reshape(predictions, new_size)
         return predictions
 
@@ -88,7 +90,11 @@ class SlidingWindowInferer2D(Inferer):
     """
 
     def __init__(
-        self, roi_size, sw_batch_size: int = 1, overlap: float = 0.25, mode: Union[BlendMode, str] = BlendMode.CONSTANT
+        self,
+        roi_size,
+        sw_batch_size: int = 1,
+        overlap: float = 0.25,
+        mode: Union[BlendMode, str] = BlendMode.CONSTANT,
     ):
         Inferer.__init__(self)
         self.roi_size = roi_size
@@ -107,8 +113,14 @@ class SlidingWindowInferer2D(Inferer):
         """
         # convert the network to a callable that squeezes 3D slices to 2D before performing the network prediction
         predictor_2d = Predict2DFrom3D(network)
-        return sliding_window_inference(inputs, self.roi_size, self.sw_batch_size,
-                                        predictor_2d, self.overlap, self.mode)
+        return sliding_window_inference(
+            inputs,
+            self.roi_size,
+            self.sw_batch_size,
+            predictor_2d,
+            self.overlap,
+            self.mode,
+        )
 
 
 class SlidingWindowInferer2DWithResize(Inferer):
@@ -139,7 +151,11 @@ class SlidingWindowInferer2DWithResize(Inferer):
     """
 
     def __init__(
-        self, roi_size, sw_batch_size: int = 1, overlap: float = 0.25, mode: Union[BlendMode, str] = BlendMode.CONSTANT
+        self,
+        roi_size,
+        sw_batch_size: int = 1,
+        overlap: float = 0.25,
+        mode: Union[BlendMode, str] = BlendMode.CONSTANT,
     ):
         Inferer.__init__(self)
         self.roi_size = roi_size
@@ -161,13 +177,24 @@ class SlidingWindowInferer2DWithResize(Inferer):
         resized_size = copy.deepcopy(orig_size)
         resized_size[2] = self.roi_size[0]
         resized_size[3] = self.roi_size[1]
-        inputs_resize = torch.nn.functional.interpolate(inputs, size=resized_size[2:], mode='trilinear')
+        inputs_resize = torch.nn.functional.interpolate(
+            inputs, size=resized_size[2:], mode="trilinear"
+        )
 
-        # convert the network to a callable that squeezes 3D slices to 2D before performing the network prediction
+        # convert the network to a callable that squeezes 3D slices to 2D 
+        # before performing the network prediction
         predictor_2d = Predict2DFrom3D(network)
-        outputs = sliding_window_inference(inputs_resize, self.roi_size, self.sw_batch_size,
-                                           predictor_2d, self.overlap, self.mode)
+        outputs = sliding_window_inference(
+            inputs_resize,
+            self.roi_size,
+            self.sw_batch_size,
+            predictor_2d,
+            self.overlap,
+            self.mode,
+        )
 
         # resize back to original size
-        outputs = torch.nn.functional.interpolate(outputs, size=orig_size[2:], mode='nearest')
+        outputs = torch.nn.functional.interpolate(
+            outputs, size=orig_size[2:], mode="nearest"
+        )
         return outputs

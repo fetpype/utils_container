@@ -11,10 +11,12 @@
 
 ##
 # \file       custom_transform.py
-# \brief      contains a series of custom dict transforms to be used in MONAI data preparation for the dynUnet model
+# \brief      contains a series of custom dict transforms to be used in
+#             MONAI data preparation for the dynUnet model
 #
-# \author     Marta B M Ranzini (marta.ranzini@kcl.ac.uk)
-# \date       November 2020
+# \author     Thomas Sanchez
+# \author     Original author - Marta B M Ranzini (marta.ranzini@kcl.ac.uk)
+# \date       March 2025
 
 import numpy as np
 import copy
@@ -31,8 +33,11 @@ from monai.utils import (
     ensure_tuple_rep,
     fall_back_tuple,
 )
+import torch
 
-NumpyPadModeSequence = Union[Sequence[Union[NumpyPadMode, str]], NumpyPadMode, str]
+NumpyPadModeSequence = Union[
+    Sequence[Union[NumpyPadMode, str]], NumpyPadMode, str
+]
 GridSampleModeSequence = Union[
     Sequence[Union[GridSampleMode, str]], GridSampleMode, str
 ]
@@ -88,12 +93,18 @@ class MinimumPadd(MapTransform):
                 See also: :py:class:`monai.transforms.compose.MapTransform`
             k: the target k for each spatial dimension.
                 if `k` is negative or 0, the original size is preserved.
-                if `k` is an int, the same `k` be applied to all the input spatial dimensions.
-            mode: {``"constant"``, ``"edge"``, ``"linear_ramp"``, ``"maximum"``, ``"mean"``,
-                ``"median"``, ``"minimum"``, ``"reflect"``, ``"symmetric"``, ``"wrap"``, ``"empty"``}
-                One of the listed string values or a user supplied function. Defaults to ``"constant"``.
-                See also: https://numpy.org/doc/1.18/reference/generated/numpy.pad.html
-                It also can be a sequence of string, each element corresponds to a key in ``keys``.
+                if `k` is an int, the same `k` be applied to all the input
+                spatial dimensions.
+            mode: {``"constant"``, ``"edge"``, ``"linear_ramp"``,
+                    ``"maximum"``, ``"mean"``, ``"median"``,
+                    ``"minimum"``, ``"reflect"``, ``"symmetric"``,
+                    ``"wrap"``, ``"empty"``}
+                One of the listed string values or a user supplied function.
+                Defaults to ``"constant"``.
+                See also:
+                https://numpy.org/doc/1.18/reference/generated/numpy.pad.html
+                It also can be a sequence of string, each element
+                corresponds to a key in ``keys``.
         See also :py:class:`monai.transforms.SpatialPad`
         """
         super().__init__(keys)
@@ -111,23 +122,13 @@ class MinimumPadd(MapTransform):
         return d
 
 
-from monai.transforms import Spacingd, Spacing
-from monai.utils import GridSampleMode, GridSamplePadMode
-from monai.transforms.utils import convert_to_contiguous
-from monai.data.utils import resample_datalist
-from monai.transforms.lazy.functional import apply_pending_transforms
-from monai.utils import ensure_tuple
-import numpy as np
-import copy
-from typing import Dict, Hashable, Mapping, Optional, Sequence, Union
-import torch
-
-
 class InPlaneSpacingd(Spacingd):
     """
-    Performs the same operation as the MONAI Spacingd transform but allows preserving spacing along some axes,
-    which should be indicated as -1.0 in the input `pixdim`.
-    E.g. `pixdim=(0.8, 0.8, -1.0)` will change the x-y plane spacing while preserving the original z spacing.
+    Performs the same operation as the MONAI Spacingd transform but
+    allows preserving spacing along some axes, which should be
+    indicated as -1.0 in the input `pixdim`.
+    E.g. `pixdim=(0.8, 0.8, -1.0)` will change the x-y plane
+    spacing while preserving the original z spacing.
 
     Supports **lazy execution** in MONAI's modern interface.
     """
@@ -141,7 +142,8 @@ class InPlaneSpacingd(Spacingd):
             Sequence[Union[str, GridSampleMode]], Union[str, GridSampleMode]
         ] = GridSampleMode.BILINEAR,
         padding_mode: Union[
-            Sequence[Union[str, GridSamplePadMode]], Union[str, GridSamplePadMode]
+            Sequence[Union[str, GridSamplePadMode]],
+            Union[str, GridSamplePadMode],
         ] = GridSamplePadMode.BORDER,
         align_corners: Union[Sequence[bool], bool] = False,
         dtype: Union[Sequence[np.dtype], np.dtype] = np.float64,
@@ -156,19 +158,24 @@ class InPlaneSpacingd(Spacingd):
         """
         Args:
             keys: keys of the corresponding items to be transformed.
-            pixdim: output voxel spacing. If `-1.0` is provided, that axis' spacing is preserved.
-            diagonal: whether to resample the input to have a diagonal affine matrix.
+            pixdim: output voxel spacing. If `-1.0` is provided, that axis'
+             spacing is preserved.
+            diagonal: whether to resample the input to have a diagonal
+             affine matrix.
             mode: Interpolation mode for resampling.
             padding_mode: Padding mode for outside grid values.
             align_corners: Whether to align corners during interpolation.
             dtype: Data type for resampling computation.
             scale_extent: Whether to compute scale based on full voxel extent.
-            recompute_affine: If True, recompute affine to avoid quantization errors.
+            recompute_affine: If True, recompute affine to avoid
+             quantization errors.
             min_pixdim: Minimal spacing allowed before resampling.
             max_pixdim: Maximal spacing allowed before resampling.
-            ensure_same_shape: Ensure that outputs have the same shape when inputs do.
+            ensure_same_shape: Ensure that outputs have the same shape when
+             inputs do.
             allow_missing_keys: If True, missing keys won't raise an error.
-            lazy: If `True`, the transform will be stored in metadata instead of applied immediately.
+            lazy: If `True`, the transform will be stored in metadata instead
+             of applied immediately.
         """
         super().__init__(
             keys=keys,
@@ -206,18 +213,16 @@ class InPlaneSpacingd(Spacingd):
             Dictionary with transformed data.
         """
         d = dict(data)
-        lazy_ = self.lazy if lazy is None else lazy
 
         for key in self.key_iterator(d):
-            
-            
+
             meta_data = d[key].meta
-        
+
             current_pixdim = copy.deepcopy(self.pixdim)
             original_pixdim = meta_data["pixdim"]
             old_pixdim = original_pixdim[1:4]
             current_pixdim[self.dim_to_keep] = old_pixdim[self.dim_to_keep]
-            
+
             spacing_transform = Spacing(
                 current_pixdim,
                 diagonal=self.diagonal,
@@ -230,21 +235,25 @@ class InPlaneSpacingd(Spacingd):
             )
 
             d[key] = spacing_transform(data_array=d[key])
-        
+
         return d
 
 
 class RestoreOriginalSpacingd(MapTransform):
-    def __init__(self, keys: Sequence[Hashable], allow_missing_keys: bool = False):
+    def __init__(
+        self, keys: Sequence[Hashable], allow_missing_keys: bool = False
+    ):
         super().__init__(keys, allow_missing_keys)
-    
-    def __call__(self, data: Mapping[Hashable, torch.Tensor]) -> Dict[Hashable, torch.Tensor]:
+
+    def __call__(
+        self, data: Mapping[Hashable, torch.Tensor]
+    ) -> Dict[Hashable, torch.Tensor]:
         d = dict(data)
         for key in self.key_iterator(d):
             meta_data = d[key].meta
-            
+
             original_pixdim = meta_data["pixdim"].squeeze()
-            
+
             # Resample back to original spacing
             spacing_transform = Spacing(
                 pixdim=original_pixdim[1:4],  # Exclude batch dimension

@@ -1,11 +1,17 @@
 from monai.networks.layers import Norm
-from monai.networks.nets import UNet, DynUNet, AttentionUnet, SwinUNETR, BasicUNet
+from monai.networks.nets import (
+    UNet,
+    DynUNet,
+    AttentionUnet,
+    SwinUNETR,
+    BasicUNet,
+)
 
 UNet = UNet(
     spatial_dims=2,
     in_channels=1,
     out_channels=2,
-    channels=(64, 128, 256, 512, 1024),#(32, 64, 128, 256, 512),
+    channels=(64, 128, 256, 512, 1024),  # (32, 64, 128, 256, 512),
     strides=(2, 2, 2, 2),
     # num_res_units=2,
     norm=Norm.BATCH,
@@ -20,7 +26,7 @@ BasicUNet = BasicUNet(
     spatial_dims=2,
     in_channels=1,
     out_channels=2,
-    features=(64, 128, 256, 512, 1024, 64), #(32, 64, 128, 256, 512)
+    features=(64, 128, 256, 512, 1024, 64),  # (32, 64, 128, 256, 512)
     norm=Norm.BATCH,
     dropout=0.15,
 )
@@ -29,7 +35,13 @@ AttUNet = AttentionUnet(
     spatial_dims=2,
     in_channels=1,
     out_channels=2,
-    channels=(64, 128, 256, 512, 1024),  # (32, 64, 128, 256, 512),(64, 128, 256, 512, 1024)
+    channels=(
+        64,
+        128,
+        256,
+        512,
+        1024,
+    ),  # (32, 64, 128, 256, 512),(64, 128, 256, 512, 1024)
     strides=(2, 2, 2, 2),
     kernel_size=3,
     up_kernel_size=3,
@@ -45,7 +57,10 @@ def dynunet():
     strides, kernels = [], []
     while True:
         spacing_ratio = [sp / min(spacings) for sp in spacings]
-        stride = [2 if ratio <= 2 and size >= 8 else 1 for (ratio, size) in zip(spacing_ratio, sizes)]
+        stride = [
+            2 if ratio <= 2 and size >= 8 else 1
+            for (ratio, size) in zip(spacing_ratio, sizes)
+        ]
         kernel = [3 if ratio <= 2 else 1 for ratio in spacing_ratio]
         if all(s == 1 for s in stride):
             break

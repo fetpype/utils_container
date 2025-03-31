@@ -11,61 +11,48 @@
 
 ##
 # \file       monai_dynunet_inference.py
-# \brief      Script to perform automated fetal brain segmentation using a pre-trained dynUNet model in MONAI
+# \brief      Script to perform automated fetal brain segmentation using a
+#             pre-trained dynUNet model in MONAI
 #               Example config file required by the main function is shown in
 #               monaifbs/config/monai_dynUnet_inference_config.yml
 #               Example of model loaded by this evaluation function is stored in
 #               monaifbs/models/checkpoint_dynUnet_DiceXent.pt
 #
+# \author     Thomas Sanchez (thomas.sanchez@unil.ch)
 # \author     Marta B M Ranzini (marta.ranzini@kcl.ac.uk)
-# \date       November 2020
+# \date       March 2025
 #
 
 import os
+import logging
 import sys
 import yaml
 import argparse
-import logging
 import torch
-
-from torch.utils.data import DataLoader
-
 from monai.config import print_config
 from monai.data import DataLoader, Dataset
 from fetpype_utils.monaifbs.models.old_dynunet import DynUNet
-from monai.engines import SupervisedEvaluator
-from monai.handlers import CheckpointLoader, StatsHandler, PostProcessing
 from monai.transforms import (
     Compose,
     LoadImaged,
     NormalizeIntensityd,
-    ToTensord,
-    SqueezeDimd,
     ToMetaTensord,
     Activationsd,
     AsDiscreted,
     SaveImaged,
-    Spacingd,
     EnsureChannelFirstd,
     KeepLargestConnectedComponentd,
 )
-from monai.transforms import SaveImage
 from fetpype_utils import monaifbs
-from fetpype_utils.monaifbs.src.utils.custom_inferer import SlidingWindowInferer2D
-from fetpype_utils.monaifbs.src.utils.custom_transform import InPlaneSpacingd, RestoreOriginalSpacingd
-
-import os
-import torch
-import yaml
-import logging
-import sys
-import numpy as np
-from monai.transforms import (
-    Compose, LoadImaged, EnsureChannelFirstd, NormalizeIntensityd,
-    Spacingd, ToMetaTensord, Activationsd, AsDiscreted, KeepLargestConnectedComponentd, SaveImaged
+from fetpype_utils.monaifbs.src.utils.custom_transform import (
+    InPlaneSpacingd,
+    RestoreOriginalSpacingd,
 )
-from monai.data import Dataset, DataLoader
 from monai.inferers import SlidingWindowInferer
+#from fetpype_utils.monaifbs.src.utils.custom_inferer import (
+#    SlidingWindowInferer2D,
+#)
+
 
 def create_data_list_of_dictionaries(input_files):
     """
@@ -91,44 +78,51 @@ def create_data_list_of_dictionaries(input_files):
             )
     return full_list
 
+
 def run_inference(input_data, config_info):
     print(f"Running on {input_data}")
     val_files = create_data_list_of_dictionaries(input_data)
-    
+
     logging.basicConfig(stream=sys.stdout, level=logging.INFO)
     print("*** MONAI config: ")
     print_config()
-    
+
     print("*** Network inference config: ")
     print(yaml.dump(config_info))
-    
+
     nr_out_channels = config_info["inference"]["nr_out_channels"]
     spacing = config_info["inference"]["spacing"]
     prob_thr = config_info["inference"]["probability_threshold"]
     model_to_load = config_info["inference"]["model_to_load"]
     patch_size = config_info["inference"]["inplane_size"] + [1]
-    
+
     if not os.path.exists(model_to_load):
         raise FileNotFoundError("Trained model not found")
-    
+
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     print(f"Using device: {device}")
-    
-    val_transforms = Compose([
-        LoadImaged(keys=["image"]),
-        EnsureChannelFirstd(keys=["image"]),
-        NormalizeIntensityd(keys=["image"], nonzero=False, channel_wise=True),
-        InPlaneSpacingd(
+
+    val_transforms = Compose(
+        [
+            LoadImaged(keys=["image"]),
+            EnsureChannelFirstd(keys=["image"]),
+            NormalizeIntensityd(
+                keys=["image"], nonzero=False, channel_wise=True
+            ),
+            InPlaneSpacingd(
                 keys=["image"],
                 pixdim=spacing,
                 mode="bilinear",
             ),
-        ToMetaTensord(keys=["image"]),
-    ])
-    
+            ToMetaTensord(keys=["image"]),
+        ]
+    )
+
     val_ds = Dataset(data=val_files, transform=val_transforms)
-    val_loader = DataLoader(val_ds, batch_size=1, num_workers=config_info["device"]["num_workers"])
-    
+    val_loader = DataLoader(
+        val_ds, batch_size=1, num_workers=config_info["device"]["num_workers"]
+    )
+
     print("***  Preparing network ... ")
     # automatically extracts the strides and kernels based on nnU-Net empirical rules
     spacings = spacing[:2]
@@ -165,50 +159,72 @@ def run_inference(input_data, config_info):
     net.load_state_dict(torch.load(model_to_load, map_location="cpu")["net"])
     net.to(device)
     net.eval()
-    
-    post_transforms = Compose([
-        Activationsd(keys="pred", sigmoid=nr_out_channels == 1, softmax=nr_out_channels > 1),
-        AsDiscreted(keys="pred", argmax=True, threshold_values=True, logit_thresh=prob_thr),
-        KeepLargestConnectedComponentd(keys="pred", applied_labels=1),
-        RestoreOriginalSpacingd(
-            keys="pred",
-        ),
-        SaveImaged(keys="pred", output_dir="./output", output_postfix="test"),
-    ])
-    
+
+    post_transforms = Compose(
+        [
+            Activationsd(
+                keys="pred",
+                sigmoid=nr_out_channels == 1,
+                softmax=nr_out_channels > 1,
+            ),
+            AsDiscreted(
+                keys="pred",
+                argmax=True,
+                threshold_values=True,
+                logit_thresh=prob_thr,
+            ),
+            KeepLargestConnectedComponentd(keys="pred", applied_labels=1),
+            RestoreOriginalSpacingd(
+                keys="pred",
+            ),
+            SaveImaged(
+                keys="pred", output_dir="./output", output_postfix="test"
+            ),
+        ]
+    )
+
     # Reshape [1, 1, H, W, D] → [D, 1, H, W] (batch of 2D slices)
 
-
-    inferer = SlidingWindowInferer(roi_size=[448,512], sw_batch_size=4, overlap=0.0)
+    inferer = SlidingWindowInferer(
+        roi_size=[448, 512], sw_batch_size=4, overlap=0.0
+    )
     # import pdb
     # print("*** Running inference...")
     with torch.no_grad():
         for batch in val_loader:
             image = batch["image"].to(device)
-            depth = image.shape[-1]
-            batch_2d = image.permute(4, 0, 1, 2, 3).contiguous()  # (D, 1, H, W)
+            batch_2d = image.permute(
+                4, 0, 1, 2, 3
+            ).contiguous()  # (D, 1, H, W)
 
             # Sliding window inferer (now operates on all slices at once)
-            
+
             batch_2d = batch_2d.squeeze(1)
             # Perform inference with TTA (flipping)
             print("BATCH SIZE", batch_2d.shape)
-            
+
             pred = inferer(batch_2d, net)  # Forward pass on all slices
-            flip_pred_1 = torch.flip(inferer(torch.flip(batch_2d, dims=(2,)), net), dims=(2,))
-            flip_pred_2 = torch.flip(inferer(torch.flip(batch_2d, dims=(3,)), net), dims=(3,))
-            flip_pred_3 = torch.flip(inferer(torch.flip(batch_2d, dims=(2, 3)), net), dims=(2, 3))
+            flip_pred_1 = torch.flip(
+                inferer(torch.flip(batch_2d, dims=(2,)), net), dims=(2,)
+            )
+            flip_pred_2 = torch.flip(
+                inferer(torch.flip(batch_2d, dims=(3,)), net), dims=(3,)
+            )
+            flip_pred_3 = torch.flip(
+                inferer(torch.flip(batch_2d, dims=(2, 3)), net), dims=(2, 3)
+            )
 
             # Average predictions
             pred = (pred + flip_pred_1 + flip_pred_2 + flip_pred_3) / 4
 
             # Reshape back to [1, 1, H, W, D]
             pred_3d = pred.permute(1, 2, 3, 0)  # (1, 1, H, W, D)
-            pred_3d.meta["affine"] = pred_3d.meta["affine"].squeeze(0)  # Convert from [1, 4, 4] to [4, 4]
-
+            pred_3d.meta["affine"] = pred_3d.meta["affine"].squeeze(
+                0
+            )  # Convert from [1, 4, 4] to [4, 4]
 
             batch = post_transforms({"pred": pred_3d})
-    
+
     print("Done!")
 
 
