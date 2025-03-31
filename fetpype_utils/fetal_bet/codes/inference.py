@@ -143,20 +143,18 @@ def inference(args):
             ),
             tr.Activationsd(keys="pred", softmax=True),
             tr.AsDiscreted(keys="pred", argmax=True, to_onehot=None),
+            tr.KeepLargestConnectedComponentd(keys="pred", applied_labels=1),
             SaveImaged(
                 keys="pred",
                 meta_keys="pred_meta_dict",
                 output_dir=args.save_path,
                 print_log=False,
                 separate_folder=False,
-                output_postfix="mask",
+                output_postfix="",
                 resample=False,
             ),
         ]
     )
-    print("here1")
-    print(len(test_dataloader))
-    print(args.data_path)
     with torch.no_grad():
         for i, test_data in enumerate(tqdm(test_dataloader, desc="Inference")):
             test_inputs = test_data["image"].to(device)

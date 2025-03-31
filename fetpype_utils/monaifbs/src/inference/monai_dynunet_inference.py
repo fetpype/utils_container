@@ -15,8 +15,8 @@
 #             pre-trained dynUNet model in MONAI
 #               Example config file required by the main function is shown in
 #               monaifbs/config/monai_dynUnet_inference_config.yml
-#               Example of model loaded by this evaluation function is stored in
-#               monaifbs/models/checkpoint_dynUnet_DiceXent.pt
+#               Example of model loaded by this evaluation function is
+#               stored in monaifbs/models/checkpoint_dynUnet_DiceXent.pt
 #
 # \author     Thomas Sanchez (thomas.sanchez@unil.ch)
 # \author     Marta B M Ranzini (marta.ranzini@kcl.ac.uk)
@@ -27,61 +27,31 @@ import os
 import logging
 import sys
 import yaml
-import argparse
 import torch
 from monai.config import print_config
-from monai.data import DataLoader, Dataset
 from fetpype_utils.monaifbs.models.old_dynunet import DynUNet
 from monai.transforms import (
     Compose,
     LoadImaged,
     NormalizeIntensityd,
-    ToMetaTensord,
     Activationsd,
     AsDiscreted,
     SaveImaged,
     EnsureChannelFirstd,
     KeepLargestConnectedComponentd,
-)
-from fetpype_utils import monaifbs
-from fetpype_utils.monaifbs.src.utils.custom_transform import (
-    InPlaneSpacingd,
-    RestoreOriginalSpacingd,
+    Spacingd,
 )
 from monai.inferers import SlidingWindowInferer
-#from fetpype_utils.monaifbs.src.utils.custom_inferer import (
-#    SlidingWindowInferer2D,
-#)
+import numpy as np
+from tqdm import tqdm
 
 
-def create_data_list_of_dictionaries(input_files):
-    """
-    Convert the list of input files to be processed in the dictionary format needed for MONAI
-    Args:
-        input_files: str or list of strings, filenames of images to be processed
-    Returns:
-        full_list: list of dicts, storing the filenames input to the inference pipeline
-    """
-
-    print("*** Input data: ")
-    full_list = []
-    # convert to list if single file
-    if type(input_files) is str:
-        input_files = [input_files]
-    for current_f in input_files:
-        if os.path.isfile(current_f):
-            print(current_f)
-            full_list.append({"image": current_f})
-        else:
-            raise FileNotFoundError(
-                "Expected image file: {} not found".format(current_f)
-            )
-    return full_list
+def affine_norm(affine):
+    return np.sqrt((affine[0:3, 0:3] ** 2).sum(0))
 
 
 def run_inference(input_data, config_info):
     print(f"Running on {input_data}")
-    val_files = create_data_list_of_dictionaries(input_data)
 
     logging.basicConfig(stream=sys.stdout, level=logging.INFO)
     print("*** MONAI config: ")
@@ -104,27 +74,22 @@ def run_inference(input_data, config_info):
 
     val_transforms = Compose(
         [
-            LoadImaged(keys=["image"]),
             EnsureChannelFirstd(keys=["image"]),
             NormalizeIntensityd(
                 keys=["image"], nonzero=False, channel_wise=True
             ),
-            InPlaneSpacingd(
+            Spacingd(
                 keys=["image"],
-                pixdim=spacing,
+                pixdim=(0.8, 0.8, -1.0),
                 mode="bilinear",
+                padding_mode="zeros",
             ),
-            ToMetaTensord(keys=["image"]),
         ]
     )
 
-    val_ds = Dataset(data=val_files, transform=val_transforms)
-    val_loader = DataLoader(
-        val_ds, batch_size=1, num_workers=config_info["device"]["num_workers"]
-    )
-
     print("***  Preparing network ... ")
-    # automatically extracts the strides and kernels based on nnU-Net empirical rules
+    # automatically extracts the strides and kernels
+    # based on nnU-Net empirical rules
     spacings = spacing[:2]
     sizes = patch_size[:2]
     strides, kernels = [], []
@@ -163,46 +128,39 @@ def run_inference(input_data, config_info):
     post_transforms = Compose(
         [
             Activationsd(
-                keys="pred",
+                keys="image",
                 sigmoid=nr_out_channels == 1,
                 softmax=nr_out_channels > 1,
             ),
             AsDiscreted(
-                keys="pred",
+                keys="image",
                 argmax=True,
                 threshold_values=True,
                 logit_thresh=prob_thr,
             ),
-            KeepLargestConnectedComponentd(keys="pred", applied_labels=1),
-            RestoreOriginalSpacingd(
-                keys="pred",
-            ),
-            SaveImaged(
-                keys="pred", output_dir="./output", output_postfix="test"
-            ),
+            KeepLargestConnectedComponentd(keys="image", applied_labels=1),
         ]
     )
-
-    # Reshape [1, 1, H, W, D] → [D, 1, H, W] (batch of 2D slices)
 
     inferer = SlidingWindowInferer(
         roi_size=[448, 512], sw_batch_size=4, overlap=0.0
     )
-    # import pdb
-    # print("*** Running inference...")
+    print("*** Running inference...")
+
+    loader = LoadImaged(
+        keys=["image"], reader="NibabelReader", image_only=False
+    )
+
     with torch.no_grad():
-        for batch in val_loader:
-            image = batch["image"].to(device)
-            batch_2d = image.permute(
-                4, 0, 1, 2, 3
-            ).contiguous()  # (D, 1, H, W)
+        for data in tqdm(input_data):
 
-            # Sliding window inferer (now operates on all slices at once)
+            im = loader({"image": data})
+            meta = im["image"].meta
+            im = val_transforms(im)["image"].to(device)
 
-            batch_2d = batch_2d.squeeze(1)
+            batch_2d = im.permute(3, 0, 1, 2).contiguous()
+
             # Perform inference with TTA (flipping)
-            print("BATCH SIZE", batch_2d.shape)
-
             pred = inferer(batch_2d, net)  # Forward pass on all slices
             flip_pred_1 = torch.flip(
                 inferer(torch.flip(batch_2d, dims=(2,)), net), dims=(2,)
@@ -217,95 +175,28 @@ def run_inference(input_data, config_info):
             # Average predictions
             pred = (pred + flip_pred_1 + flip_pred_2 + flip_pred_3) / 4
 
-            # Reshape back to [1, 1, H, W, D]
-            pred_3d = pred.permute(1, 2, 3, 0)  # (1, 1, H, W, D)
-            pred_3d.meta["affine"] = pred_3d.meta["affine"].squeeze(
-                0
-            )  # Convert from [1, 4, 4] to [4, 4]
+            pred_3d = pred.permute(1, 2, 3, 0)
+            post = post_transforms({"image": pred_3d})
 
-            batch = post_transforms({"pred": pred_3d})
+            pixdim = affine_norm(meta["original_affine"]).tolist() + [-1.0]
+            invert = Spacingd(
+                keys=["image"],
+                pixdim=pixdim + [-1.0],
+                mode="nearest",
+            )
+
+            post = invert(post)
+            post["image"].meta = meta
+
+            saver = SaveImaged(
+                keys="image",
+                output_dir=config_info["output"]["out_dir"],
+                print_log=False,
+                separate_folder=False,
+                output_postfix="",
+                output_ext=".nii.gz",
+                resample=False,
+            )
+            saver(post)
 
     print("Done!")
-
-
-if __name__ == "__main__":
-
-    parser = argparse.ArgumentParser(
-        description="Run inference with dynUnet with MONAI."
-    )
-    parser.add_argument(
-        "--in_files",
-        dest="in_files",
-        metavar="in_files",
-        type=str,
-        nargs="+",
-        help="all files to be processed",
-        required=True,
-    )
-    parser.add_argument(
-        "--out_folder",
-        dest="out_folder",
-        metavar="out_folder",
-        type=str,
-        help="directory where to store the outputs",
-        required=True,
-    )
-    parser.add_argument(
-        "--out_postfix",
-        dest="out_postfix",
-        metavar="out_postfix",
-        type=str,
-        help="postfix to add to the input names for the output filename",
-        default="seg",
-    )
-    parser.add_argument(
-        "--config_file",
-        dest="config_file",
-        metavar="config_file",
-        type=str,
-        help="config file containing network information for inference",
-        default=None,
-    )
-    args = parser.parse_args()
-
-    # check existence of config file and read it
-    config_file = args.config_file
-    if config_file is None:
-        config_file = os.path.join(
-            *[
-                os.path.dirname(monaifbs.__file__),
-                "config",
-                "monai_dynUnet_inference_config.yml",
-            ]
-        )
-    if not os.path.isfile(config_file):
-        raise FileNotFoundError(
-            "Expected config file: {} not found".format(config_file)
-        )
-    with open(config_file) as f:
-        print("*** Config file")
-        print(config_file)
-        config = yaml.load(f, Loader=yaml.FullLoader)
-
-    # read the input files
-    in_files = args.in_files
-
-    # add the output directory to the config dictionary
-    config["output"] = {
-        "out_postfix": args.out_postfix,
-        "out_dir": args.out_folder,
-    }
-    if not os.path.exists(config["output"]["out_dir"]):
-        os.makedirs(config["output"]["out_dir"])
-
-    if config["inference"]["model_to_load"] == "default":
-        config["inference"]["model_to_load"] = os.path.join(
-            *[
-                os.path.dirname(monaifbs.__file__),
-                "models",
-                "checkpoint_dynUnet_DiceXent.pt",
-            ]
-        )
-    print(in_files, config)
-    # run inference with MONAI dynUnet
-    run_inference(in_files, config)

@@ -62,7 +62,7 @@ def run_brain_extraction(in_dir, out_dir, method):
 
         # add the output directory to the config dictionary
         config["output"] = {
-            "out_postfix": "mask",
+            "out_postfix": "",
             "out_dir": out_dir,
         }
         os.makedirs(config["output"]["out_dir"], exist_ok=True)
@@ -96,6 +96,14 @@ def run_brain_extraction(in_dir, out_dir, method):
         args.save_path = out_dir
 
         inference(args)
+
+    # Then take the out_dir / in_files and rename them:
+    for f in os.listdir(in_dir):
+        if f.endswith(".nii.gz"):
+            out_name = os.path.join(out_dir, os.path.basename(f))
+            out_rename = out_name.replace("_T2w", "_mask")
+            # move the file
+            os.rename(out_name, out_rename)
 
 
 def main():
