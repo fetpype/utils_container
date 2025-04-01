@@ -11,4 +11,15 @@ dependencies = [
     "monai==1.4.0",
     "SimpleITK",
     "antspyx",
+    "tqdm",
+    "nibabel",
+    "scikit-image",
 ]
+[tool.setuptools]
+packages = ["fetpype_utils"]
+
+
+[project.scripts]
+run_brain_extraction = "fetpype_utils.cli.run_brain_extraction:main"
+run_denoising = "fetpype_utils.cli.run_denoising:main"
+run_bias_field_correction = "fetpype_utils.cli.run_bias_field_correction:main"

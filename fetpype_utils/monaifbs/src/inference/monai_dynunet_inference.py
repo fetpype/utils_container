@@ -187,7 +187,6 @@ def run_inference(input_data, config_info):
 
             post = invert(post)
             post["image"].meta = meta
-
             saver = SaveImaged(
                 keys="image",
                 output_dir=config_info["output"]["out_dir"],
