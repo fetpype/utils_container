@@ -31,6 +31,13 @@ def print_title(text, center=True, char="-"):
 
 
 def run_brain_extraction(in_dir, out_dir, method, device):
+    in_files = [
+            os.path.join(in_dir, p)
+            for p in os.listdir(in_dir)
+            if p.endswith(".nii.gz")
+        ]
+    print(f"Found {len(in_files)} files in {in_dir}")
+
 
     if method == "monaifbs":
         from fetpype_utils.monaifbs.src.inference.monai_dynunet_inference import (
@@ -67,11 +74,7 @@ def run_brain_extraction(in_dir, out_dir, method, device):
         }
         os.makedirs(config["output"]["out_dir"], exist_ok=True)
         config["inference"]["model_to_load"] = brain_ckpt
-        in_files = [
-            os.path.join(in_dir, p)
-            for p in os.listdir(in_dir)
-            if p.endswith(".nii.gz")
-        ]
+        
         run_inference(in_files, config)
     else:
         from fetpype_utils.fetal_bet.codes.inference import inference
@@ -142,24 +145,17 @@ def main():
     p.add_argument(
         "--device",
         type=str,
-        default="cuda",
-        choices=["cuda", "cpu"],
+        default="cuda:0",
     )
     args = p.parse_args()
-    print_title("Running Brain extraction")
+    print_title(f"Running Brain extraction ({args.method} -- {args.device})")
 
     input_dir = args.input_dir
     out_dir = args.out_dir
 
     os.makedirs(out_dir, exist_ok=True)
-    # Creating the pattern to save the resulting masks
 
-    # Create a tmp directory for the output of monaifbs segmentation
-    # masks_tmp = os.path.join(args.masks_dir, "tmp")
-    # files_paths = [o[3] for o in files_filtered]
     run_brain_extraction(input_dir, out_dir, args.method, args.device)
-    # Move files to their definitive location
-    # bidsify_monaifbs(files_filtered, bids_layout, mask_pattern, masks_tmp)
 
     return 0
 
