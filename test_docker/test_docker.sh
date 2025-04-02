@@ -21,4 +21,11 @@ docker run --gpus all -v ${in_dir}test:/data -v ${in_dir}docker_denoise:/denoise
 docker run --gpus all -v ${in_dir}test:/data -v ${in_dir}docker_debias:/debias --rm fetpype/utils:latest run_bias_field_correction --input_stacks /data/sub-chuv014_ses-01_acq-haste_run-1_T2w.nii.gz /data/sub-chuv014_ses-01_acq-haste_run-2_T2w.nii.gz /data/sub-chuv014_ses-01_acq-haste_run-3_T2w.nii.gz /data/sub-chuv014_ses-01_acq-haste_run-4_T2w.nii.gz --output_dir /debias 
 
 
-docker run --gpus all -v ${in_dir}test:/data -v ${in_dir}docker_debias:/debias --rm fetpype/utils:latest run_bias_field_correction --input_stacks /data/sub-chuv083_ses-01_acq-haste_run-1_T2w.nii.gz /data/sub-chuv014_ses-01_acq-haste_run-2_T2w.nii.gz /data/sub-chuv083_ses-01_acq-haste_run-3_T2w.nii.gz /data/sub-chuv083_ses-01_acq-haste_run-4_T2w.nii.gz --output_dir /debias 
+docker run --gpus all -v ${in_dir}test:/data -v ${in_dir}docker_debias:/debias --rm fetpype/utils:latest run_bias_field_correction --input_stacks /data/sub-chuv083_ses-01_acq-haste_run-1_T2w.nii.gz /data/sub-chuv014_ses-01_acq-haste_run-2_T2w.nii.gz /data/sub-chuv083_ses-01_acq-haste_run-3_T2w.nii.gz /data/sub-chuv083_ses-01_acq-haste_run-4_T2w.nii.gz --output_dir /debias
+
+
+docker run --gpus all -v ${in_dir}test:/data -v ${in_dir}docker_debias:/debias --rm fetpype/utils:latest run_bias_field_correction --input_stacks /data/sub-chuv083_ses-01_acq-haste_run-1_T2w.nii.gz /data/sub-chuv014_ses-01_acq-haste_run-2_T2w.nii.gz /data/sub-chuv083_ses-01_acq-haste_run-3_T2w.nii.gz /data/sub-chuv083_ses-01_acq-haste_run-4_T2w.nii.gz --output_stacks /debias/sub-chuv083_ses-01_acq-haste_run-1_T2w.nii.gz /debias/sub-chuv014_ses-01_acq-haste_run-2_T2w.nii.gz /data/sub-chuv083_ses-01_acq-haste_run-3_T2w.nii.gz /debias/sub-chuv083_ses-01_acq-haste_run-4_T2w.nii.gz
+
+
+
+

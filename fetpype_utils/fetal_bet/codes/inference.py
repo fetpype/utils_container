@@ -58,8 +58,16 @@ class SliceWiseNormalizeIntensityd(MapTransform):
 
 
 class FetalTestData:
-    def __init__(self, test_data_paths, img_size=256):
-        self.test_data_paths = test_data_paths
+    def __init__(self, test_dir, test_files=None, img_size=256):
+        self.test_dir = test_dir
+        self.test_files = test_files
+        # Assert that only one of test_dir or test_files is provided
+        if test_dir is None and test_files is None:
+            raise ValueError("Either test_dir or test_files must be provided.")
+        if test_dir is not None and test_files is not None:
+            raise ValueError(
+                "Only one of test_dir or test_files should be provided."
+            )
         self.img_size = img_size
 
     def transformations(self):
@@ -80,9 +88,10 @@ class FetalTestData:
 
     def load_data(self):
         test_transforms_list = self.transformations()
-        test_images = sorted(
-            glob(os.path.join(self.test_data_paths, "*.nii.gz"))
-        )
+        if self.test_dir:
+            test_images = sorted(glob(os.path.join(self.test_dir, "*.nii.gz")))
+        else:
+            test_images = sorted(self.test_files)
 
         test_files = [{"image": image_name} for image_name in test_images]
 
@@ -118,7 +127,9 @@ def inference(args):
 
     model.eval()
 
-    fetal_test_data = FetalTestData(args.data_path)
+    fetal_test_data = FetalTestData(
+        test_dir=args.data_path, test_files=args.data_files
+    )
     test_dataloader, test_org_transforms_list = fetal_test_data.load_data()
 
     inferer = SliceInferer(
