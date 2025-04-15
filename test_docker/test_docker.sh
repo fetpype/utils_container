@@ -29,5 +29,7 @@ docker run --gpus all -v ${in_dir}test:/data -v ${in_dir}docker_debias:/debias -
 
 
 ### Testing singularity version
-docker run --gpus all --rm -v "$PWD":/data  gerardmartijuan/fetpype_utils:latest run_brain_extraction --input_stacks /data/sub-CC00864XX15_ses-2731_run-09_T2w.nii.gz /data/sub-CC00864XX15_ses-2731_run-10_T2w.nii.gz /data/sub-CC00864XX15_ses-2731_run-11_T2w.nii.gz --output_masks /data/sub-CC00864XX15_ses-2731_run-09_T2w_mask.nii.gz /data/sub-CC00864XX15_ses-2731_run-10_T2w_mask.nii.gz /data/sub-CC00864XX15_ses-2731_run-11_T2w_mask.nii.gz --method fet_bet
+docker run --gpus all --rm -v "$PWD":/data gerardmartijuan/fetpype_utils:latest run_brain_extraction --input_stacks /data/sub-CC00864XX15_ses-2731_run-09_T2w.nii.gz /data/sub-CC00864XX15_ses-2731_run-10_T2w.nii.gz /data/sub-CC00864XX15_ses-2731_run-11_T2w.nii.gz --output_masks /data/sub-CC00864XX15_ses-2731_run-09_T2w_mask.nii.gz /data/sub-CC00864XX15_ses-2731_run-10_T2w_mask.nii.gz /data/sub-CC00864XX15_ses-2731_run-11_T2w_mask.nii.gz --method fet_bet
 
+
+docker run --gpus all --rm -v "$PWD":/data gerardmartijuan/fetpype_utils:latest run_brain_extraction --input_dir /data/data --output_dir /data/masks --method fet_bet
