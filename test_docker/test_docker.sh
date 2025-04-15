@@ -33,3 +33,6 @@ docker run --gpus all --rm -v "$PWD":/data gerardmartijuan/fetpype_utils:latest 
 
 
 docker run --gpus all --rm -v "$PWD":/data gerardmartijuan/fetpype_utils:latest run_brain_extraction --input_dir /data/data --output_dir /data/masks --method fet_bet
+
+
+docker run --gpus all --rm -v "$PWD":/data thsanchez/fetpype_utils:latest run_brain_extraction --input_stacks /data/sub-CC00864XX15_ses-2731_run-13_T2w.nii.gz --output_masks /data/sub-CC00864XX15_ses-2731_run-13_T2w_mask.nii.gz --method monaifbs
