@@ -32,7 +32,6 @@ def print_title(text, center=True, char="-"):
 
 
 def run_brain_extraction(in_files, out_dir, out_masks, method, device):
-    print("RUNNING:", in_files, out_dir, out_masks, method, device)
     if in_files is not None:
         # Check that the files exist
         for f in in_files:
