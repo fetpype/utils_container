@@ -8,4 +8,4 @@ This folder contains the following methods:
 - `run_denoising`: Image denoising using ANTS' DenoiseImage.
 - `run_bias_field_correction`: Bias field correction using ANTS' implementation of the N4 algorithm.
 
-The main purpose of this repository is to be the base for building the docker container `thsanchez/fetpype_utils:latest` that can be pulled from docker hub and is required to run `Fetpype`. 
+The main purpose of this repository is to be the base for building the docker container `thsanchez/fetpype_utils:latest` that can be pulled from [docker hub](https://hub.docker.com/r/thsanchez/fetpype_utils) and is required to run `fetpype`. 
