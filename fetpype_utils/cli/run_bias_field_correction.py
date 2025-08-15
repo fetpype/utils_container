@@ -6,7 +6,6 @@ from fetpype_utils.utils import (
 )
 from tqdm import tqdm
 
-
 def correct_bias_field(input_stacks, input_masks, output_dir, output_stacks):
     if output_dir is not None:
         os.makedirs(output_dir, exist_ok=True)

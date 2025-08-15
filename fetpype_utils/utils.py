@@ -14,38 +14,31 @@ def check_same_folder(in_files):
         ), f"These files should all be in the same directory: {in_files}"
 
 
-def check_and_fix_sitk_im_mask(
-    image: sitk.Image,
-    mask: Optional[sitk.Image],
-) -> (sitk.Image, sitk.Image):
+def align_mask_to_image(image, mask, tol=1e-3):
     """
-    Check if the image and mask are in the same physical space (origin).
-    If not, set the mask origin to be the same as the image origin.
+    Align the mask to the image by setting the mask's origin, spacing, and direction
+    to match the image's.
     """
-    if mask is None:
-        return image, None
+    mask = sitk.Image(mask)  # create a copy
+    # Check distance between image and mask getorigin
 
-    if (
-        sum([im - m for im, m in zip(image.GetOrigin(), mask.GetOrigin())])
-        < 1e-5
-    ):
-        mask.SetOrigin(image.GetOrigin())
-    else:
+    if not np.allclose(image.GetOrigin(), mask.GetOrigin(), atol=tol):
         raise ValueError(
             "Image and mask are not in the same physical space (origin)."
         )
-
-    if (
-        sum([im - m for im, m in zip(image.GetSpacing(), mask.GetSpacing())])
-        < 1e-5
-    ):
-        mask.SetSpacing(image.GetSpacing())
-    else:
+    if not np.allclose(image.GetSpacing(), mask.GetSpacing(), atol=tol):
         raise ValueError(
             "Image and mask are not in the same physical space (spacing)."
         )
 
-    return image, mask
+    if not np.allclose(image.GetDirection(), mask.GetDirection(), atol=tol):
+        raise ValueError(
+            "Image and mask are not in the same physical space (direction)."
+        )
+    mask.SetOrigin(image.GetOrigin())
+    mask.SetSpacing(image.GetSpacing())
+    mask.SetDirection(image.GetDirection())
+    return mask
 
 
 def n4_bias_field_correction_single(
@@ -57,7 +50,7 @@ def n4_bias_field_correction_single(
     Perform N4 bias field correction on a single image.
     """
     if mask is not None:
-        image, mask = check_and_fix_sitk_im_mask(image, mask)
+        mask = align_mask_to_image(image, mask)
     shrinkFactor = n4_params.get("shrink_factor", 2)
     if shrinkFactor > 1:
         sitk_img = sitk.Shrink(image, [shrinkFactor] * image.GetDimension())
