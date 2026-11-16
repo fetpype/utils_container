@@ -75,6 +75,23 @@ def run_brain_extraction(in_files, out_dir, out_masks, method, device):
         config["inference"]["model_to_load"] = brain_ckpt
 
         run_inference(in_files, config)
+    elif method == "fet_bet2":
+        from fetpype_utils.fetal_bet2.codes.inference import inference
+        import torch
+
+        # Make it a Namespace
+        from types import SimpleNamespace
+
+        args = SimpleNamespace()
+        args.n_gpu = 1
+        args.device = device
+        args.pipeline = "auto"
+        args.save_path = out_dir
+        args.refine = 1
+        args.amp = 0
+        for f in in_files:
+            args.input_path = f
+            inference(args)
     else:
         from fetpype_utils.fetal_bet.codes.inference import inference
         import fetpype_utils
@@ -106,11 +123,13 @@ def run_brain_extraction(in_files, out_dir, out_masks, method, device):
             out_name = os.path.join(out_dir, os.path.basename(f))
             out_rename = out_name.replace("_T2w", "_mask")
             # move the file
-            os.rename(out_name, out_rename)
+            if os.path.isfile(out_name):
+                os.rename(out_name, out_rename)
     else:
         for f, m in zip(in_files, out_masks):
             out_name = os.path.join(out_dir, os.path.basename(f))
-            os.rename(out_name, m)
+            if os.path.isfile(out_name):
+                os.rename(out_name, m)
 
 
 def main():
@@ -155,7 +174,7 @@ def main():
 
     p.add_argument(
         "--method",
-        choices=["monaifbs", "fet_bet"],
+        choices=["monaifbs", "fet_bet", "fet_bet2"],
         default="monaifbs",
     )
 
